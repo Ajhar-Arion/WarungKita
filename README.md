@@ -10,6 +10,7 @@
   Pengaturan & verifikasi PIN saat membuka aplikasi. Menggunakan EncryptedSharedPreferences (AES-256, lokal device).
 - **Customer Management**  
   CRUD customer, search, update dan upload foto customer (kamera/galeri).
+  ![Costomer](Images/Screenshot_20260114_130318.png)
 - **Inventory Management**  
   Manajemen produk/stock, tambah & edit produk, filter kategori, notifikasi stok rendah, dan pencarian.
 - **Purchase Management**  
