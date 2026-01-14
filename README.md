@@ -13,14 +13,20 @@
   ![Costomer](Images/Screenshot_20260114_130318.png)
 - **Inventory Management**  
   Manajemen produk/stock, tambah & edit produk, filter kategori, notifikasi stok rendah, dan pencarian.
+  ![inventory](Images/Screenshot_20260114_130331.png)
 - **Purchase Management**  
   Checkout produk per customer, otomatis hitung total & update stock, generate invoice.
+  ![Pembelian](Images/Screenshot_20260114_130356.png)
 - **Invoice Management**  
   List invoice, update status, generate PDF, share/print invoice, filter status, nomor invoice otomatis `INV-YYYYMMDD-XXX`.
+  ![Invoice](Images/Screenshot_20260114_130413.png)
 - **Export/Import Excel (CSV)**  
   Ekspor transaksi ke CSV (bisa dibuka di Excel), impor inventory dari file CSV, download template, preview sebelum simpan atau ekspor.
+  ![ExportImport](Images/Screenshot_20260114_130529.png)
+  ![ExportImport2](Images/Screenshot_20260114_130517.png)
 - **Modern UI dengan Jetpack Compose**  
   Navigasi intuitif dan responsif.
+  ![ExportImport2](Images/Screenshot_20260114_115240.png)
 
 ---
 
