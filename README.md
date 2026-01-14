@@ -142,7 +142,7 @@ Referensi detail struktur dan package di [notes.md](notes.md).
 
 ## 📃 Lisensi
 
-[MIT](LICENSE) (atau tambahkan lisensi sesuai preferensi Anda)
+[MIT](LICENSE)
 
 ---
 
@@ -156,7 +156,6 @@ Silakan buat issue atau pull request untuk fitur tambahan, bug, atau saran.
 
 Ajhar Arion  
 [Github Profile](https://github.com/Ajhar-Arion)  
-(sertakan email/website jika diinginkan)
 
 ---
 
