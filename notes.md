@@ -52,9 +52,10 @@ implementation("androidx.camera:camera-view:1.3.1")
 // Coil (untuk load & display foto)
 implementation("io.coil-kt:coil-compose:2.5.0")
 
-// Apache POI (untuk export Excel .xlsx)
-implementation("org.apache.poi:poi:5.2.5")
-implementation("org.apache.poi:poi-ooxml:5.2.5")
+// Fastexcel (untuk import/export Excel .xlsx)
+implementation("org.dhatim:fastexcel:0.20.0")
+implementation("org.dhatim:fastexcel-reader:0.20.0")
+coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 ```
 
 ## Package Structure Plan
@@ -202,18 +203,16 @@ fun AddCustomerScreen(
 ## 📊 Fitur Export/Import (Implemented)
 
 ### Keputusan Teknis
-- **OpenCSV** dipilih sebagai library karena lebih ringan dari Apache POI untuk Android
-- File CSV dapat dibuka dan diedit di Excel, Google Sheets, LibreOffice
-- Tidak perlu library berat untuk format .xlsx
+- **Fastexcel** digunakan untuk generate dan membaca file Excel native `.xlsx`
+- Template, import, dan export memakai workbook `.xlsx`
+- Reader streaming dipakai agar proses import/update tetap ringan
 
 ### Import Inventory
 ```kotlin
-// ExcelHelper.kt - Import CSV
-fun importFromCsv(context: Context, uri: Uri): ImportResult {
-    // Parse CSV dengan OpenCSV
-    val csvReader = CSVReaderBuilder(reader)
-        .withSkipLines(1) // Skip header
-        .build()
+// ExcelHelper.kt - Import Excel .xlsx
+fun importFromExcel(context: Context, uri: Uri): ImportResult {
+    // Parse .xlsx dengan Fastexcel Reader
+    val workbook = ReadableWorkbook(inputStream, ReadingOptions(true, true))
     // Return products list + errors
 }
 
@@ -223,14 +222,14 @@ fun importFromCsv(context: Context, uri: Uri): ImportResult {
 
 ### Export Transaksi
 ```kotlin
-// ExcelHelper.kt - Export CSV
-fun exportInvoicesToCsv(
+// ExcelHelper.kt - Export Excel .xlsx
+fun exportInvoicesToExcel(
     context: Context,
     invoices: List<Invoice>,
     includeItems: Boolean = true
 ): File {
-    // Write header + data rows
-    // Optionally include detail items section
+    // Write workbook sheets with Fastexcel
+    // Optionally include detail items sheet
 }
 ```
 

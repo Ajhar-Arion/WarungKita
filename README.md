@@ -20,8 +20,8 @@
 - **Invoice Management**  
   List invoice, update status, generate PDF, share/print invoice, filter status, nomor invoice otomatis `INV-YYYYMMDD-XXX`.
   ![Invoice](Images/Screenshot_20260114_130413.png)
-- **Export/Import Excel (CSV)**  
-  Ekspor transaksi ke CSV (bisa dibuka di Excel), impor inventory dari file CSV, download template, preview sebelum simpan atau ekspor.
+- **Export/Import Excel (.xlsx)**  
+  Ekspor transaksi ke file Excel .xlsx, impor inventory dari template .xlsx, download template, preview sebelum simpan atau ekspor.
   ![ExportImport](Images/Screenshot_20260114_130529.png)
   ![ExportImport2](Images/Screenshot_20260114_130517.png)
 - **Modern UI dengan Jetpack Compose**  
@@ -43,7 +43,7 @@
 | **Camera** | CameraX | 1.3.1 |
 | **Image Loading** | Coil | 2.5.0 |
 | **PDF** | iText7 | 7.2.5 |
-| **Excel/CSV** | Apache POI, OpenCSV | 5.2.5, - |
+| **Excel** | Fastexcel | 0.20.0 |
 | **Barcode (Opsional)** | MLKit | 17.2.0 |
 | **Coroutines** | kotlinx-coroutines-android | 1.7.3 |
 | **Datetime** | kotlinx-datetime | 0.5.0 |
@@ -82,7 +82,7 @@ Referensi detail struktur dan package di [notes.md](notes.md).
 
 - **Auth:** SetupPinScreen, PinEntryScreen
 - **Dashboard:** CustomerList, Inventory, Purchase, InvoiceList, Export, Settings
-- **CRUD:** Add/Edit Customer/Produk, Import/Export CSV, Invoice Detail/PDF
+- **CRUD:** Add/Edit Customer/Produk, Import/Export Excel, Invoice Detail/PDF
 
 ---
 
@@ -122,8 +122,8 @@ Referensi detail struktur dan package di [notes.md](notes.md).
 
 ## 📤 Export / 📥 Import Data
 
-- **Export transaksi ke CSV/Excel**
-- **Import produk dari template CSV (bisa edit di Excel)**
+- **Export transaksi ke Excel .xlsx**
+- **Import produk dari template .xlsx (bisa edit di Excel)**
 - **Preview data sebelum ekspor/impor**
 
 ---

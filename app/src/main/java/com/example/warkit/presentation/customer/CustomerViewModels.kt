@@ -1,5 +1,6 @@
 package com.example.warkit.presentation.customer
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,12 +9,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.warkit.domain.model.Customer
 import com.example.warkit.domain.repository.CustomerRepository
+import com.example.warkit.util.ExcelHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class CustomerListState(
     val customers: List<Customer> = emptyList(),
@@ -57,6 +61,107 @@ class CustomerListViewModel(
     fun deleteCustomer(customerId: Long) {
         viewModelScope.launch {
             customerRepository.deleteCustomer(customerId)
+        }
+    }
+}
+
+data class ImportCustomerState(
+    val isLoading: Boolean = false,
+    val previewCustomers: List<Customer> = emptyList(),
+    val successCount: Int = 0,
+    val failedCount: Int = 0,
+    val errors: List<String> = emptyList(),
+    val showPreview: Boolean = false,
+    val importComplete: Boolean = false,
+    val importedCount: Int = 0,
+    val skippedDuplicateCount: Int = 0,
+    val message: String = ""
+)
+
+class ImportCustomerViewModel(
+    private val customerRepository: CustomerRepository
+) : ViewModel() {
+    
+    var state by mutableStateOf(ImportCustomerState())
+        private set
+    
+    fun parseFile(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            state = state.copy(isLoading = true, errors = emptyList(), importComplete = false)
+            
+            try {
+                val result = ExcelHelper.importCustomersFromExcel(context, uri)
+                state = state.copy(
+                    isLoading = false,
+                    previewCustomers = result.customers,
+                    successCount = result.successCount,
+                    failedCount = result.failedCount,
+                    errors = result.errors,
+                    showPreview = result.customers.isNotEmpty(),
+                    message = if (result.customers.isEmpty()) "Tidak ada customer valid untuk diimport" else ""
+                )
+            } catch (e: Exception) {
+                state = state.copy(
+                    isLoading = false,
+                    errors = listOf("Error: ${e.message}"),
+                    showPreview = false
+                )
+            }
+        }
+    }
+    
+    fun confirmImport() {
+        viewModelScope.launch {
+            state = state.copy(isLoading = true)
+            
+            val existingKeys = customerRepository.getAllCustomers()
+                .first()
+                .map { it.importKey() }
+                .toMutableSet()
+            val fileKeys = mutableSetOf<String>()
+            var imported = 0
+            var skipped = 0
+            val newErrors = mutableListOf<String>()
+            
+            state.previewCustomers.forEach { customer ->
+                val key = customer.importKey()
+                if (key in existingKeys || key in fileKeys) {
+                    skipped++
+                    return@forEach
+                }
+                
+                try {
+                    customerRepository.insertCustomer(customer)
+                    imported++
+                    existingKeys.add(key)
+                    fileKeys.add(key)
+                } catch (e: Exception) {
+                    newErrors.add("Customer '${customer.name}': ${e.message}")
+                }
+            }
+            
+            state = state.copy(
+                isLoading = false,
+                showPreview = false,
+                importComplete = true,
+                importedCount = imported,
+                skippedDuplicateCount = skipped,
+                errors = state.errors + newErrors,
+                message = "$imported customer berhasil diimport"
+            )
+        }
+    }
+    
+    fun resetState() {
+        state = ImportCustomerState()
+    }
+    
+    private fun Customer.importKey(): String {
+        val normalizedPhone = phone.trim()
+        return if (normalizedPhone.isNotBlank()) {
+            "phone:${normalizedPhone.lowercase(Locale.ROOT)}"
+        } else {
+            "name:${name.trim().lowercase(Locale.ROOT)}"
         }
     }
 }

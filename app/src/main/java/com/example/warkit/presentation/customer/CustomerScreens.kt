@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,41 +23,63 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.warkit.domain.model.Customer
+import com.example.warkit.presentation.components.WarkitScaffold
+import com.example.warkit.presentation.components.WarkitSearchField
+import com.example.warkit.presentation.components.WarkitTab
 import com.example.warkit.util.PhotoHelper
 import java.io.File
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerListScreen(
     state: CustomerListState,
+    customerTotals: Map<Long, Double> = emptyMap(),
     onSearchQueryChange: (String) -> Unit,
     onAddCustomerClick: () -> Unit,
+    onImportCustomerClick: () -> Unit = {},
     onCustomerClick: (Long) -> Unit,
     onDeleteCustomer: (Long) -> Unit,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onTabSelected: (WarkitTab) -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf<Customer?>(null) }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Daftar Customer") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                }
-            )
-        },
+    WarkitScaffold(
+        title = "List Customer",
+        selectedTab = WarkitTab.Customers,
+        onTabSelected = onTabSelected,
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddCustomerClick) {
-                Icon(Icons.Default.Add, contentDescription = "Tambah Customer")
+            Column(horizontalAlignment = Alignment.End) {
+                ExtendedFloatingActionButton(
+                    onClick = onImportCustomerClick,
+                    shape = RoundedCornerShape(8.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.FileUpload, contentDescription = "Import Customer")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Import Customer")
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                ExtendedFloatingActionButton(
+                    onClick = onAddCustomerClick,
+                    shape = RoundedCornerShape(8.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Tambah Customer")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Tambah Customer")
+                }
             }
         }
     ) { padding ->
@@ -65,24 +88,23 @@ fun CustomerListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search Bar
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = onSearchQueryChange,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Cari customer...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (state.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                        }
-                    }
-                },
-                singleLine = true
-            )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                WarkitSearchField(
+                    value = state.searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = "Cari customer",
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = {}) {
+                    Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                }
+            }
             
             if (state.isLoading) {
                 Box(
@@ -116,7 +138,8 @@ fun CustomerListScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 152.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(
                         items = state.customers,
@@ -124,6 +147,7 @@ fun CustomerListScreen(
                     ) { customer ->
                         CustomerListItem(
                             customer = customer,
+                            totalPurchase = customerTotals[customer.id] ?: 0.0,
                             onClick = { onCustomerClick(customer.id) },
                             onDelete = { showDeleteDialog = customer }
                         )
@@ -161,17 +185,23 @@ fun CustomerListScreen(
 @Composable
 fun CustomerListItem(
     customer: Customer,
+    totalPurchase: Double = 0.0,
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val context = LocalContext.current
+    val priceFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+            maximumFractionDigits = 0
+        }
+    }
     
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -179,39 +209,77 @@ fun CustomerListItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Customer photo
             CustomerPhoto(
                 photoPath = customer.photoPath,
                 name = customer.name,
-                size = 50
+                size = 42
             )
             
             Spacer(modifier = Modifier.width(12.dp))
             
-            // Customer info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = customer.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (customer.phone.isNotEmpty()) {
                     Text(
                         text = customer.phone,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                val address = customer.address.ifBlank { customer.email }
+                if (address.isNotEmpty()) {
+                    Text(
+                        text = address,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
             
-            // Delete button
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Hapus",
-                    tint = MaterialTheme.colorScheme.error
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "Total Pembelian",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = priceFormat.format(totalPurchase),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Row {
+                    IconButton(
+                        onClick = onClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Hapus",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
     }

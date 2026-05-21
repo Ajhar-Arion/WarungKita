@@ -29,6 +29,22 @@ data class InventoryListState(
     val isLoading: Boolean = true
 )
 
+private fun formatRupiahInput(input: String): String {
+    val digits = input.filter { it.isDigit() }
+    if (digits.isBlank()) return ""
+    
+    val normalized = digits.trimStart('0').ifEmpty { "0" }
+    return normalized
+        .reversed()
+        .chunked(3)
+        .joinToString(".")
+        .reversed()
+}
+
+private fun parseRupiahInput(input: String): Double {
+    return input.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
+}
+
 class InventoryListViewModel(
     private val productRepository: ProductRepository
 ) : ViewModel() {
@@ -140,10 +156,7 @@ class AddProductViewModel(
     }
     
     fun onPriceChange(price: String) {
-        // Only allow numbers and decimal point
-        if (price.isEmpty() || price.matches(Regex("^\\d*\\.?\\d*$"))) {
-            state = state.copy(price = price)
-        }
+        state = state.copy(price = formatRupiahInput(price))
     }
     
     fun onStockChange(stock: String) {
@@ -174,7 +187,7 @@ class AddProductViewModel(
             return
         }
         
-        val price = state.price.toDoubleOrNull() ?: 0.0
+        val price = parseRupiahInput(state.price)
         val stock = state.stock.toIntOrNull() ?: 0
         val minStock = state.minStock.toIntOrNull() ?: 5
         val skuToCheck = state.sku.trim()
@@ -251,7 +264,9 @@ class EditProductViewModel(
                 state = state.copy(
                     name = product.name,
                     sku = product.sku,
-                    price = if (product.price > 0) product.price.toString() else "",
+                    price = if (product.price > 0) {
+                        formatRupiahInput(product.price.toLong().toString())
+                    } else "",
                     stock = product.stock.toString(),
                     minStock = product.minStock.toString(),
                     category = product.category,
@@ -284,9 +299,7 @@ class EditProductViewModel(
     }
     
     fun onPriceChange(price: String) {
-        if (price.isEmpty() || price.matches(Regex("^\\d*\\.?\\d*$"))) {
-            state = state.copy(price = price)
-        }
+        state = state.copy(price = formatRupiahInput(price))
     }
     
     fun onStockChange(stock: String) {
@@ -315,7 +328,7 @@ class EditProductViewModel(
             return
         }
         
-        val price = state.price.toDoubleOrNull() ?: 0.0
+        val price = parseRupiahInput(state.price)
         val stock = state.stock.toIntOrNull() ?: 0
         val minStock = state.minStock.toIntOrNull() ?: 5
         val skuToCheck = state.sku.trim()

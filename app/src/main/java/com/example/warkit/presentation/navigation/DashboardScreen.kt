@@ -97,14 +97,14 @@ fun DashboardScreen(
             DashboardMenuCard(
                 icon = Icons.Default.FileUpload,
                 title = "Import Inventory",
-                description = "Import data dari file CSV/Excel",
+                description = "Import data dari file Excel .xlsx",
                 onClick = onImportClick
             )
             
             DashboardMenuCard(
                 icon = Icons.Default.FileDownload,
                 title = "Export Transaksi",
-                description = "Export data ke file CSV/Excel",
+                description = "Export data ke file Excel .xlsx",
                 onClick = onExportClick
             )
         }

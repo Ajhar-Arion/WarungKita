@@ -3,9 +3,12 @@ package com.example.warkit.presentation.`import`
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -13,11 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.warkit.domain.model.Product
+import com.example.warkit.presentation.components.WarkitScaffold
+import com.example.warkit.presentation.components.WarkitTab
 import com.example.warkit.util.ExcelHelper
 import java.text.NumberFormat
 import java.util.Locale
@@ -30,70 +36,115 @@ fun ImportInventoryScreen(
     onConfirmImport: (updateDuplicateStock: Boolean) -> Unit,
     onDismissDuplicateDialog: () -> Unit = {},
     onDownloadTemplate: () -> Unit,
-    onNavigateBack: () -> Unit
+    onExportProducts: () -> Unit = {},
+    onNavigateBack: () -> Unit,
+    onTabSelected: (WarkitTab) -> Unit = {}
 ) {
-    val context = LocalContext.current
-    
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { onFileSelected(it) }
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Import Inventory") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali")
-                    }
-                }
-            )
-        }
+    WarkitScaffold(
+        title = "Update Barang",
+        selectedTab = WarkitTab.Update,
+        onTabSelected = onTabSelected
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(padding),
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (state.importComplete) {
-                // Import Complete Screen
-                ImportCompleteView(
-                    importedCount = state.importedCount,
-                    stockUpdatedCount = state.stockUpdatedCount,
-                    errors = state.errors,
-                    onNavigateBack = onNavigateBack
+                item {
+                    ImportSuccessCard(
+                        importedCount = state.importedCount,
+                        stockUpdatedCount = state.stockUpdatedCount,
+                        errors = state.errors
+                    )
+                }
+            }
+            
+            item {
+                UpdateHintCard()
+            }
+            
+            item {
+                UpdateActionRow(
+                    icon = Icons.Default.Description,
+                    title = "Download Template Excel",
+                    trailingIcon = Icons.Default.Download,
+                    onClick = onDownloadTemplate
                 )
-            } else if (state.showPreview) {
-                // Preview Screen
-                PreviewImportView(
-                    newProducts = state.newProducts,
-                    duplicateProducts = state.duplicateProducts,
-                    successCount = state.successCount,
-                    failedCount = state.failedCount,
-                    errors = state.errors,
-                    isLoading = state.isLoading,
-                    onConfirm = { onConfirmImport(false) },
-                    onCancel = onNavigateBack
-                )
-            } else {
-                // Initial Screen - File Selection
-                FileSelectionView(
-                    isLoading = state.isLoading,
-                    errors = state.errors,
-                    onSelectFile = {
+            }
+            
+            item {
+                UpdateActionRow(
+                    icon = Icons.Default.FileUpload,
+                    title = if (state.isLoading) "Memproses file..." else "Import Excel",
+                    trailingIcon = Icons.Default.ChevronRight,
+                    enabled = !state.isLoading,
+                    onClick = {
                         filePickerLauncher.launch(arrayOf(
-                            "text/csv",
-                            "text/comma-separated-values",
-                            "application/csv",
-                            "*/*" // Fallback for all files
+                            ExcelHelper.XLSX_MIME_TYPE,
+                            "*/*"
                         ))
-                    },
-                    onDownloadTemplate = onDownloadTemplate
+                    }
                 )
+            }
+            
+            item {
+                UpdateActionRow(
+                    icon = Icons.Default.FileDownload,
+                    title = "Export Data",
+                    trailingIcon = Icons.Default.ChevronRight,
+                    onClick = onExportProducts
+                )
+            }
+            
+            item {
+                ImportDropZone(
+                    isLoading = state.isLoading,
+                    importComplete = state.importComplete,
+                    onClick = {
+                        filePickerLauncher.launch(arrayOf(
+                            ExcelHelper.XLSX_MIME_TYPE,
+                            "*/*"
+                        ))
+                    }
+                )
+            }
+            
+            if (state.errors.isNotEmpty()) {
+                item {
+                    ImportErrorCard(errors = state.errors)
+                }
+            }
+            
+            if (state.showPreview) {
+                item {
+                    ImportPreviewCard(
+                        newProducts = state.newProducts,
+                        duplicateProducts = state.duplicateProducts,
+                        successCount = state.successCount,
+                        failedCount = state.failedCount,
+                        errors = emptyList(),
+                        isLoading = state.isLoading,
+                        onConfirm = { onConfirmImport(false) },
+                        onCancel = onNavigateBack
+                    )
+                }
+            } else {
+                item {
+                    TemplatePreviewCard()
+                }
+            }
+            
+            item {
+                LastImportCard(importComplete = state.importComplete)
             }
         }
     }
@@ -106,6 +157,421 @@ fun ImportInventoryScreen(
             onSkipDuplicates = { onConfirmImport(false) },
             onDismiss = onDismissDuplicateDialog
         )
+    }
+}
+
+@Composable
+private fun UpdateHintCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Perbarui data barang dengan mudah menggunakan file Excel. Download template, isi data, lalu import kembali ke aplikasi.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    trailingIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(23.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                trailingIcon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImportDropZone(
+    isLoading: Boolean,
+    importComplete: Boolean,
+    onClick: () -> Unit
+) {
+    OutlinedCard(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = if (importComplete) Icons.Default.CheckCircle else Icons.Default.Description,
+                contentDescription = null,
+                modifier = Modifier.size(42.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = when {
+                    isLoading -> "Memproses file..."
+                    importComplete -> "Import Berhasil"
+                    else -> "Tap untuk memilih file Excel"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Gunakan file .xlsx dari template Excel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImportSuccessCard(
+    importedCount: Int,
+    stockUpdatedCount: Int,
+    errors: List<String>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Import Berhasil",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    text = "$importedCount barang baru, $stockUpdatedCount stok diperbarui",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            if (errors.isNotEmpty()) {
+                Text(
+                    text = "${errors.size} catatan",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportErrorCard(errors: List<String>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Catatan Import",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            errors.take(3).forEach { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TemplatePreviewCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Preview Template",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            TemplateTableHeader()
+            TemplateRow("BRG001", "Beras", "Sembako", "100", "15000")
+            TemplateRow("BRG002", "Gula", "Sembako", "80", "14000")
+            TemplateRow("...", "...", "...", "...", "...")
+        }
+    }
+}
+
+@Composable
+private fun TemplateTableHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        TemplateCell("Kode Barang", 1.1f, true)
+        TemplateCell("Nama Barang", 1.2f, true)
+        TemplateCell("Kategori", 1f, true)
+        TemplateCell("Stok", 0.7f, true)
+        TemplateCell("Harga", 0.9f, true)
+    }
+}
+
+@Composable
+private fun TemplateRow(
+    code: String,
+    name: String,
+    category: String,
+    stock: String,
+    price: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        TemplateCell(code, 1.1f)
+        TemplateCell(name, 1.2f)
+        TemplateCell(category, 1f)
+        TemplateCell(stock, 0.7f)
+        TemplateCell(price, 0.9f)
+    }
+    HorizontalDivider()
+}
+
+@Composable
+private fun RowScope.TemplateCell(
+    value: String,
+    weight: Float,
+    header: Boolean = false
+) {
+    Text(
+        text = value,
+        modifier = Modifier.weight(weight),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun LastImportCard(importComplete: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Terakhir Import",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (importComplete) "Baru saja" else "Belum ada import di sesi ini",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (importComplete) {
+                AssistChip(
+                    onClick = {},
+                    label = { Text("Import Berhasil") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportPreviewCard(
+    newProducts: List<Product>,
+    duplicateProducts: List<DuplicateProduct>,
+    successCount: Int,
+    failedCount: Int,
+    errors: List<String>,
+    isLoading: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Preview Import",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = {}, label = { Text("Baru: ${newProducts.size}") })
+                if (duplicateProducts.isNotEmpty()) {
+                    AssistChip(onClick = {}, label = { Text("Duplikat: ${duplicateProducts.size}") })
+                }
+                if (failedCount > 0) {
+                    AssistChip(onClick = {}, label = { Text("Gagal: $failedCount") })
+                }
+            }
+            
+            TemplateTableHeader()
+            newProducts.take(4).forEach { product ->
+                TemplateRow(
+                    code = product.sku.ifBlank { "BRG" },
+                    name = product.name,
+                    category = product.category.ifBlank { "-" },
+                    stock = product.stock.toString(),
+                    price = product.price.toLong().toString()
+                )
+            }
+            if (newProducts.size > 4) {
+                Text(
+                    text = "... dan ${newProducts.size - 4} barang lainnya",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (errors.isNotEmpty()) {
+                Text(
+                    text = errors.first(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Batal")
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isLoading && (successCount > 0 || duplicateProducts.isNotEmpty()),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Import")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -222,7 +688,7 @@ private fun FileSelectionView(
         )
         
         Text(
-            text = "Upload file CSV untuk menambahkan produk secara massal.\nFile CSV dapat dibuat dan diedit menggunakan Excel.",
+            text = "Upload file .xlsx untuk menambahkan produk secara massal.\nFile Excel dapat dibuat dari template aplikasi.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -242,7 +708,7 @@ private fun FileSelectionView(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Format File CSV:",
+                    text = "Format File Excel:",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -259,7 +725,7 @@ private fun FileSelectionView(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    text = "• Simpan file dengan format .csv",
+                    text = "• Simpan file dengan format .xlsx",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -327,7 +793,7 @@ private fun FileSelectionView(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text(if (isLoading) "Memproses..." else "Pilih File CSV")
+            Text(if (isLoading) "Memproses..." else "Pilih File Excel")
         }
     }
 }

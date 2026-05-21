@@ -33,6 +33,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "11"
@@ -72,8 +73,10 @@ dependencies {
     // Material Icons Extended
     implementation(libs.androidx.compose.material.icons)
     
-    // OpenCSV for Excel-compatible import/export
-    implementation(libs.opencsv)
+    // Fastexcel for native XLSX import/export
+    implementation(libs.fastexcel)
+    implementation(libs.fastexcel.reader)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

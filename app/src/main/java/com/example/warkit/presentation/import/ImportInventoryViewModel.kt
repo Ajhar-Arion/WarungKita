@@ -47,7 +47,7 @@ class ImportInventoryViewModel(
             state = state.copy(isLoading = true, errors = emptyList())
             
             try {
-                val result = ExcelHelper.importFromCsv(context, uri)
+                val result = ExcelHelper.importFromExcel(context, uri)
                 
                 // Check for duplicate SKUs
                 val skus = result.products.mapNotNull { 

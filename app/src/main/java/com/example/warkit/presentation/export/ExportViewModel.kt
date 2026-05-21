@@ -116,7 +116,7 @@ class ExportViewModel(
             state = state.copy(isLoading = true, error = null)
             
             try {
-                val file = ExcelHelper.exportInvoicesToCsv(
+                val file = ExcelHelper.exportInvoicesToExcel(
                     context = context,
                     invoices = state.invoices,
                     includeItems = state.includeItems
@@ -135,9 +135,9 @@ class ExportViewModel(
         }
     }
     
-    fun shareExportedFile(context: Context) {
+    fun openExportedFile(context: Context) {
         state.exportedFile?.let { file ->
-            ExcelHelper.shareExportFile(context, file)
+            ExcelHelper.openExportFile(context, file)
         }
     }
     

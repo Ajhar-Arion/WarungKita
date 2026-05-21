@@ -1,7 +1,7 @@
 [versions]
-agp = "8.13.2"
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.27"
+agp = "9.2.1"
+kotlin = "2.2.10"
+ksp = "2.3.2"
 coreKtx = "1.10.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -12,10 +12,11 @@ composeBom = "2024.09.00"
 securityCrypto = "1.1.0-alpha06"
 navigationCompose = "2.7.7"
 lifecycleViewModelCompose = "2.7.0"
-room = "2.6.1"
+room = "2.7.0"
 coil = "2.5.0"
 material-icons = "1.7.8"
-opencsv = "5.9"
+fastexcel = "0.20.0"
+desugarJdkLibs = "2.1.5"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -43,8 +44,10 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 # Material Icons Extended
 androidx-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "material-icons" }
-# OpenCSV for Excel-compatible import/export
-opencsv = { group = "com.opencsv", name = "opencsv", version.ref = "opencsv" }
+# Fastexcel for native XLSX import/export
+fastexcel = { group = "org.dhatim", name = "fastexcel", version.ref = "fastexcel" }
+fastexcel-reader = { group = "org.dhatim", name = "fastexcel-reader", version.ref = "fastexcel" }
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

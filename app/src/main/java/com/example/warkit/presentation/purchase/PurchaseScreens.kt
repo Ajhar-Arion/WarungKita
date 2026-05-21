@@ -1,5 +1,6 @@
 package com.example.warkit.presentation.purchase
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -24,14 +26,21 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.warkit.domain.model.Customer
 import com.example.warkit.domain.model.Product
+import com.example.warkit.presentation.components.WarkitScaffold
+import com.example.warkit.presentation.components.WarkitTab
 import com.example.warkit.util.PhotoHelper
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PurchaseScreen(
     state: PurchaseState,
+    todayTotal: Double = 0.0,
+    todayTransactionCount: Int = 0,
+    customerCount: Int = 0,
     onSelectCustomerClick: () -> Unit,
     onSelectProductClick: () -> Unit,
     onRemoveFromCart: (Long) -> Unit,
@@ -40,9 +49,16 @@ fun PurchaseScreen(
     onNotesChange: (String) -> Unit,
     onCheckout: () -> Unit,
     onNavigateBack: () -> Unit,
-    onViewInvoice: (Long) -> Unit
+    onViewInvoice: (Long) -> Unit,
+    onTabSelected: (WarkitTab) -> Unit = {}
 ) {
-    val priceFormat = remember { NumberFormat.getCurrencyInstance(Locale("id", "ID")) }
+    val priceFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+            maximumFractionDigits = 0
+        }
+    }
+    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")) }
+    val latestItem = state.cartItems.lastOrNull()
     
     // Show completion dialog
     if (state.isCompleted && state.createdInvoiceId != null) {
@@ -64,60 +80,223 @@ fun PurchaseScreen(
         )
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Transaksi Baru") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+    WarkitScaffold(
+        title = "Pembelian Warung",
+        selectedTab = WarkitTab.Home,
+        onTabSelected = onTabSelected
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PurchaseStatCard(
+                        icon = Icons.Default.Home,
+                        label = "Total Hari Ini",
+                        value = priceFormat.format(todayTotal),
+                        accent = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PurchaseStatCard(
+                        icon = Icons.Default.Receipt,
+                        label = "Transaksi",
+                        value = todayTransactionCount.toString(),
+                        accent = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PurchaseStatCard(
+                        icon = Icons.Default.People,
+                        label = "Customer",
+                        value = customerCount.toString(),
+                        accent = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PurchaseFieldBox(
+                                label = "Tanggal",
+                                value = dateFormat.format(Date()),
+                                icon = Icons.Default.CalendarToday,
+                                modifier = Modifier.weight(1f)
+                            )
+                            PurchaseFieldBox(
+                                label = "Nama Customer",
+                                value = state.selectedCustomer?.name ?: "Pilih customer",
+                                icon = Icons.Default.Person,
+                                onClick = onSelectCustomerClick,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        PurchaseFieldBox(
+                            label = "Nama Barang",
+                            value = latestItem?.product?.name ?: "Pilih barang",
+                            icon = Icons.Default.Inventory,
+                            onClick = onSelectProductClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PurchaseFieldBox(
+                                label = "Jumlah",
+                                value = latestItem?.quantity?.toString() ?: "0",
+                                modifier = Modifier.weight(1f)
+                            )
+                            PurchaseFieldBox(
+                                label = "Harga Satuan",
+                                value = latestItem?.let { priceFormat.format(it.product.price) } ?: "Rp 0",
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        PurchaseFieldBox(
+                            label = "Subtotal",
+                            value = priceFormat.format(state.totalAmount),
+                            modifier = Modifier.fillMaxWidth(),
+                            emphasized = true
+                        )
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        OutlinedTextField(
+                            value = state.notes,
+                            onValueChange = onNotesChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Catatan") },
+                            placeholder = { Text("Tulis catatan (opsional)") },
+                            minLines = 1,
+                            maxLines = 2,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onSelectProductClick,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Tambah Barang")
+                            }
+                            Button(
+                                onClick = onCheckout,
+                                enabled = state.canCheckout && !state.isLoading,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Simpan Pembelian")
+                                }
+                            }
+                        }
+                        
+                        state.errorMessage?.let { error ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = error,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
-            )
-        },
-        bottomBar = {
-            if (state.cartItems.isNotEmpty()) {
-                Surface(
-                    shadowElevation = 8.dp,
-                    color = MaterialTheme.colorScheme.surface
+            }
+            
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Text(
+                                text = "Daftar Barang (${state.cartItems.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Total ${priceFormat.format(state.totalAmount)}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        if (state.cartItems.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 18.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = "Total (${state.itemCount} item)",
+                                    text = "Belum ada barang",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    text = priceFormat.format(state.totalAmount),
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
                             }
-                            
-                            Button(
-                                onClick = onCheckout,
-                                enabled = state.canCheckout && !state.isLoading
-                            ) {
-                                if (state.isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(Icons.Default.ShoppingCartCheckout, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Checkout")
+                        } else {
+                            state.cartItems.forEachIndexed { index, cartItem ->
+                                CompactCartItemRow(
+                                    cartItem = cartItem,
+                                    onRemove = { onRemoveFromCart(cartItem.product.id) },
+                                    onIncrease = { onIncreaseQuantity(cartItem.product.id) },
+                                    onDecrease = { onDecreaseQuantity(cartItem.product.id) },
+                                    priceFormat = priceFormat
+                                )
+                                if (index != state.cartItems.lastIndex) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                                 }
                             }
                         }
@@ -125,115 +304,194 @@ fun PurchaseScreen(
                 }
             }
         }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    }
+}
+
+@Composable
+private fun PurchaseStatCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(9.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Customer Section
-            item {
-                CustomerSection(
-                    customer = state.selectedCustomer,
-                    onClick = onSelectCustomerClick
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(accent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(16.dp)
                 )
             }
-            
-            // Cart Section
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Keranjang",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            TextButton(onClick = onSelectProductClick) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Tambah Produk")
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (state.cartItems.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.ShoppingCart,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Keranjang kosong",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = accent,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun PurchaseFieldBox(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    onClick: (() -> Unit)? = null,
+    emphasized: Boolean = false
+) {
+    val fieldModifier = if (onClick != null) {
+        modifier.clickable(onClick = onClick)
+    } else {
+        modifier
+    }
+    
+    Column(modifier = fieldModifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(7.dp),
+            color = if (emphasized) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
             } else {
-                items(state.cartItems, key = { it.product.id }) { cartItem ->
-                    CartItemCard(
-                        cartItem = cartItem,
-                        onRemove = { onRemoveFromCart(cartItem.product.id) },
-                        onIncrease = { onIncreaseQuantity(cartItem.product.id) },
-                        onDecrease = { onDecreaseQuantity(cartItem.product.id) }
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            },
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                icon?.let {
+                    Icon(
+                        imageVector = it,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactCartItemRow(
+    cartItem: CartItem,
+    onRemove: () -> Unit,
+    onIncrease: () -> Unit,
+    onDecrease: () -> Unit,
+    priceFormat: NumberFormat
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Inventory,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = cartItem.product.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${cartItem.quantity} x ${priceFormat.format(cartItem.product.price)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = priceFormat.format(cartItem.subtotal),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onDecrease,
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "Kurangi", modifier = Modifier.size(15.dp))
+                }
+                IconButton(
+                    onClick = onIncrease,
+                    enabled = cartItem.quantity < cartItem.product.stock,
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(15.dp))
+                }
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Hapus",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
-            
-            // Notes Section
-            item {
-                OutlinedTextField(
-                    value = state.notes,
-                    onValueChange = onNotesChange,
-                    label = { Text("Catatan (opsional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                    maxLines = 4
-                )
-            }
-            
-            // Error message
-            state.errorMessage?.let { error ->
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
-                    ) {
-                        Text(
-                            text = error,
-                            modifier = Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
-            
-            // Bottom spacer for floating button
-            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
 }

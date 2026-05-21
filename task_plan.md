@@ -11,7 +11,7 @@ Membangun aplikasi Android lengkap untuk manajemen pembelian customer, kontrol i
 - [x] Phase 5: Implementasi Modul Inventory + Fitur Tambah Barang ✅
 - [x] Phase 6: Implementasi Modul Purchase ✅
 - [x] Phase 7: Implementasi Modul Invoice + PDF Generation ✅
-- [x] Phase 8: Implementasi Import Inventory (CSV/Excel) ✅
+- [x] Phase 8: Implementasi Import Inventory (Excel .xlsx) ✅
 - [x] Phase 9: Implementasi Export Excel (Transaksi) ✅
 - [ ] Phase 10: Testing & Polish
 
@@ -62,16 +62,16 @@ Membangun aplikasi Android lengkap untuk manajemen pembelian customer, kontrol i
 - [x] **Format nomor invoice: `INV-YYYYMMDD-XXX`** (contoh: INV-20260113-001)
 
 ### 5. Export Data (Excel) ✅
-- [x] **📊 Export data transaksi ke file CSV (bisa dibuka di Excel)**
+- [x] **📊 Export data transaksi ke file Excel .xlsx**
 - [x] Pilih rentang tanggal export (DatePicker)
 - [x] Filter by status (All/Paid/Pending/Cancelled)
 - [x] Include detail items per invoice (toggle)
 - [x] Preview summary sebelum export
-- [x] Share file CSV/Excel
+- [x] Share file Excel .xlsx
 
 ### 6. Import Data Inventory ✅
-- [x] **📥 Import data produk dari file CSV**
-- [x] Template CSV yang bisa diedit di Excel
+- [x] **📥 Import data produk dari file Excel .xlsx**
+- [x] Template .xlsx yang bisa diedit di Excel
 - [x] Download template dari aplikasi
 - [x] Preview data sebelum import
 - [x] Support multiple item sekaligus
@@ -196,7 +196,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 ```kotlin
 // Room, Navigation, Hilt, PDF (iText), MLKit Barcode
 // CameraX (untuk foto customer)
-// Apache POI (untuk export Excel)
+// Fastexcel (untuk import/export Excel .xlsx)
 // Security Crypto (untuk PIN encryption)
 ```
 
@@ -252,7 +252,7 @@ object InvoiceNumberGenerator {
 | **Camera** | CameraX | 1.3.1 | Foto customer |
 | **Image Loading** | Coil | 2.5.0 | Load & cache images |
 | **PDF** | iText7 | 7.2.5 | Generate invoice PDF |
-| **Excel** | Apache POI | 5.2.5 | Export to .xlsx |
+| **Excel** | Fastexcel | 0.20.0 | Import/export .xlsx |
 | **Barcode** | MLKit | 17.2.0 | Scan barcode (optional) |
 
 ## Errors Encountered
@@ -269,8 +269,8 @@ object InvoiceNumberGenerator {
 | Inventory Management | ✅ | CRUD + Filter + Low Stock Alert |
 | Purchase/Cart | ✅ | Customer + Products + Checkout |
 | Invoice | ✅ | List + Detail + PDF + Status |
-| Import Inventory | ✅ | CSV + Template + Preview |
-| Export Transaksi | ✅ | CSV + Date Range + Filter |
+| Import Inventory | ✅ | XLSX + Template + Preview |
+| Export Transaksi | ✅ | XLSX + Date Range + Filter |
 
 ### Phase 9 Deliverables (Export Transaksi):
 - `ExportViewModel.kt` - State management for export
@@ -280,7 +280,7 @@ object InvoiceNumberGenerator {
 - Updated `WarkitNavGraph.kt` - Added export route
 
 ### Phase 8 Deliverables (Import Inventory):
-- `ExcelHelper.kt` - CSV import/export utility (Excel compatible)
+- `ExcelHelper.kt` - XLSX import/export utility with Fastexcel
 - `ImportInventoryViewModel.kt` - State management for import
 - `ImportInventoryScreen.kt` - UI for file selection, preview, confirm
 

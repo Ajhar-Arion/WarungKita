@@ -22,12 +22,15 @@ import com.example.warkit.presentation.purchase.*
 import com.example.warkit.presentation.`import`.*
 import com.example.warkit.presentation.export.*
 import com.example.warkit.presentation.settlement.*
+import com.example.warkit.presentation.components.WarkitTab
 import com.example.warkit.util.ExcelHelper
+import java.util.Calendar
 
 sealed class Screen(val route: String) {
     object Dashboard : Screen("dashboard")
     object CustomerList : Screen("customer_list")
     object AddCustomer : Screen("add_customer")
+    object ImportCustomer : Screen("import_customer")
     object EditCustomer : Screen("edit_customer/{customerId}") {
         fun createRoute(customerId: Long) = "edit_customer/$customerId"
     }
@@ -51,7 +54,7 @@ sealed class Screen(val route: String) {
 @Composable
 fun WarkitNavGraph(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Dashboard.route
+    startDestination: String = Screen.Purchase.route
 ) {
     val context = LocalContext.current
     val database = remember { WarkitDatabase.getInstance(context) }
@@ -62,6 +65,37 @@ fun WarkitNavGraph(
     // Shared purchase viewmodel
     val purchaseViewModel = remember { 
         PurchaseViewModel(customerRepository, productRepository, invoiceRepository) 
+    }
+    val allInvoices by invoiceRepository.getAllInvoices().collectAsState(initial = emptyList())
+    val allCustomers by customerRepository.getAllCustomers().collectAsState(initial = emptyList())
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val todayInvoices = allInvoices.filter { it.date >= todayStart }
+    val customerTotals = allInvoices
+        .groupBy { it.customerId }
+        .mapValues { entry -> entry.value.sumOf { it.totalAmount } }
+    
+    fun navigateMain(tab: WarkitTab) {
+        val route = when (tab) {
+            WarkitTab.Home -> Screen.Purchase.route
+            WarkitTab.Products -> Screen.InventoryList.route
+            WarkitTab.Customers -> Screen.CustomerList.route
+            WarkitTab.History -> Screen.InvoiceList.route
+            WarkitTab.Update -> Screen.ImportInventory.route
+        }
+        navController.navigate(route) {
+            popUpTo(Screen.Purchase.route) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
     
     NavHost(
@@ -87,13 +121,40 @@ fun WarkitNavGraph(
             
             CustomerListScreen(
                 state = state,
+                customerTotals = customerTotals,
                 onSearchQueryChange = viewModel::onSearchQueryChange,
                 onAddCustomerClick = { navController.navigate(Screen.AddCustomer.route) },
+                onImportCustomerClick = { navController.navigate(Screen.ImportCustomer.route) },
                 onCustomerClick = { customerId ->
                     navController.navigate(Screen.EditCustomer.createRoute(customerId))
                 },
                 onDeleteCustomer = viewModel::deleteCustomer,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onTabSelected = ::navigateMain
+            )
+        }
+        
+        composable(Screen.ImportCustomer.route) {
+            val viewModel = remember { ImportCustomerViewModel(customerRepository) }
+            
+            ImportCustomerScreen(
+                state = viewModel.state,
+                onFileSelected = { uri -> viewModel.parseFile(context, uri) },
+                onConfirmImport = viewModel::confirmImport,
+                onDownloadTemplate = {
+                    val templateFile = ExcelHelper.generateCustomerTemplate(context)
+                    ExcelHelper.openCustomerTemplate(context, templateFile)
+                },
+                onSaveTemplate = { uri ->
+                    runCatching {
+                        ExcelHelper.saveCustomerTemplate(context, uri)
+                    }.isSuccess
+                },
+                onNavigateBack = {
+                    viewModel.resetState()
+                    navController.popBackStack()
+                },
+                onTabSelected = ::navigateMain
             )
         }
         
@@ -146,7 +207,8 @@ fun WarkitNavGraph(
                     navController.navigate(Screen.EditProduct.createRoute(productId))
                 },
                 onDeleteProduct = viewModel::deleteProduct,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onTabSelected = ::navigateMain
             )
         }
         
@@ -192,6 +254,9 @@ fun WarkitNavGraph(
         composable(Screen.Purchase.route) {
             PurchaseScreen(
                 state = purchaseViewModel.state,
+                todayTotal = todayInvoices.sumOf { it.totalAmount },
+                todayTransactionCount = todayInvoices.size,
+                customerCount = allCustomers.size,
                 onSelectCustomerClick = { navController.navigate(Screen.SelectCustomer.route) },
                 onSelectProductClick = { navController.navigate(Screen.SelectProduct.route) },
                 onRemoveFromCart = purchaseViewModel::removeFromCart,
@@ -206,9 +271,10 @@ fun WarkitNavGraph(
                 onViewInvoice = { invoiceId ->
                     purchaseViewModel.resetPurchase()
                     navController.navigate(Screen.InvoiceDetail.createRoute(invoiceId)) {
-                        popUpTo(Screen.Dashboard.route)
+                        popUpTo(Screen.Purchase.route)
                     }
-                }
+                },
+                onTabSelected = ::navigateMain
             )
         }
         
@@ -249,7 +315,12 @@ fun WarkitNavGraph(
                 onInvoiceClick = { invoiceId ->
                     navController.navigate(Screen.InvoiceDetail.createRoute(invoiceId))
                 },
-                onNavigateBack = { navController.popBackStack() }
+                onDownloadHistory = { period ->
+                    viewModel.exportHistory(context, period, allCustomers)
+                },
+                onClearExportMessage = viewModel::clearExportMessage,
+                onNavigateBack = { navController.popBackStack() },
+                onTabSelected = ::navigateMain
             )
         }
         
@@ -276,6 +347,7 @@ fun WarkitNavGraph(
         // Import Inventory screen
         composable(Screen.ImportInventory.route) {
             val viewModel = remember { ImportInventoryViewModel(productRepository) }
+            val products by productRepository.getAllProducts().collectAsState(initial = emptyList())
             
             ImportInventoryScreen(
                 state = viewModel.state,
@@ -284,12 +356,17 @@ fun WarkitNavGraph(
                 onDismissDuplicateDialog = viewModel::dismissDuplicateDialog,
                 onDownloadTemplate = {
                     val templateFile = ExcelHelper.generateTemplate(context)
-                    ExcelHelper.shareTemplate(context, templateFile)
+                    ExcelHelper.openTemplate(context, templateFile)
+                },
+                onExportProducts = {
+                    val exportFile = ExcelHelper.exportInventoryToExcel(context, products)
+                    ExcelHelper.openExportFile(context, exportFile)
                 },
                 onNavigateBack = { 
                     viewModel.resetState()
                     navController.popBackStack() 
-                }
+                },
+                onTabSelected = ::navigateMain
             )
         }
         
@@ -304,7 +381,7 @@ fun WarkitNavGraph(
                 onStatusFilterChange = viewModel::onStatusFilterChange,
                 onIncludeItemsChange = viewModel::onIncludeItemsChange,
                 onExport = { viewModel.exportToFile(context) },
-                onShare = { viewModel.shareExportedFile(context) },
+                onOpenFile = { viewModel.openExportedFile(context) },
                 onResetExport = viewModel::resetExport,
                 onNavigateBack = { 
                     viewModel.resetExport()

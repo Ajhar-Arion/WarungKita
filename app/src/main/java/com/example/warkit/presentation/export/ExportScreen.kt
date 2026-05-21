@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +31,7 @@ fun ExportScreen(
     onStatusFilterChange: (InvoiceStatus?) -> Unit,
     onIncludeItemsChange: (Boolean) -> Unit,
     onExport: () -> Unit,
-    onShare: () -> Unit,
+    onOpenFile: () -> Unit,
     onResetExport: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -53,7 +54,7 @@ fun ExportScreen(
             ExportCompleteView(
                 fileName = state.exportedFile.name,
                 invoiceCount = state.invoices.size,
-                onShare = onShare,
+                onOpenFile = onOpenFile,
                 onExportMore = onResetExport,
                 onNavigateBack = onNavigateBack
             )
@@ -431,7 +432,7 @@ private fun SummaryItem(
 private fun ExportCompleteView(
     fileName: String,
     invoiceCount: Int,
-    onShare: () -> Unit,
+    onOpenFile: () -> Unit,
     onExportMore: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -492,12 +493,12 @@ private fun ExportCompleteView(
         Spacer(modifier = Modifier.height(32.dp))
         
         Button(
-            onClick = onShare,
+            onClick = onOpenFile,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Default.Share, null)
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Bagikan File")
+            Text("Buka File")
         }
         
         Spacer(modifier = Modifier.height(12.dp))

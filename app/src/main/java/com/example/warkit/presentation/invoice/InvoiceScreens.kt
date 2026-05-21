@@ -1,10 +1,10 @@
 package com.example.warkit.presentation.invoice
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.warkit.domain.model.Invoice
 import com.example.warkit.domain.model.InvoiceStatus
+import com.example.warkit.presentation.components.WarkitScaffold
+import com.example.warkit.presentation.components.WarkitTab
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,18 +34,63 @@ fun InvoiceListScreen(
     state: InvoiceListState,
     onStatusFilterChange: (InvoiceStatus?) -> Unit,
     onInvoiceClick: (Long) -> Unit,
-    onNavigateBack: () -> Unit
+    onDownloadHistory: (HistoryPeriod) -> Unit = {},
+    onClearExportMessage: () -> Unit = {},
+    onNavigateBack: () -> Unit,
+    onTabSelected: (WarkitTab) -> Unit = {}
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Daftar Invoice") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+    val context = LocalContext.current
+    var selectedPeriod by remember { mutableStateOf(HistoryPeriod.Today) }
+    var showDownloadSheet by remember { mutableStateOf(false) }
+    val visibleInvoices = state.invoices.filter { selectedPeriod.contains(it.date) }
+    val periodCounts = remember(state.invoices) {
+        val now = System.currentTimeMillis()
+        HistoryPeriod.entries.associateWith { period ->
+            state.invoices.count { invoice -> period.contains(invoice.date, now) }
+        }
+    }
+    val priceFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+            maximumFractionDigits = 0
+        }
+    }
+
+    LaunchedEffect(state.exportMessage) {
+        state.exportMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            onClearExportMessage()
+        }
+    }
+    
+    WarkitScaffold(
+        title = "History Pembelian",
+        selectedTab = WarkitTab.History,
+        onTabSelected = onTabSelected,
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    if (!state.isExporting) {
+                        showDownloadSheet = true
                     }
+                },
+                shape = RoundedCornerShape(8.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                if (state.isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Menyiapkan...")
+                } else {
+                    Icon(Icons.Default.FileDownload, contentDescription = "Download History")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Download History")
                 }
-            )
+            }
         }
     ) { padding ->
         Column(
@@ -51,67 +98,45 @@ fun InvoiceListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Filter chips
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            LaunchedEffect(Unit) {
+                onStatusFilterChange(null)
+            }
+            
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                item {
-                    FilterChip(
-                        selected = state.selectedStatus == null,
-                        onClick = { onStatusFilterChange(null) },
-                        label = { Text("Semua") }
-                    )
-                }
-                
-                item {
-                    FilterChip(
-                        selected = state.selectedStatus == InvoiceStatus.PENDING,
-                        onClick = { 
-                            onStatusFilterChange(
-                                if (state.selectedStatus == InvoiceStatus.PENDING) null 
-                                else InvoiceStatus.PENDING
-                            )
-                        },
-                        label = { Text("Pending") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer
-                        )
-                    )
-                }
-                
-                item {
-                    FilterChip(
-                        selected = state.selectedStatus == InvoiceStatus.PAID,
-                        onClick = { 
-                            onStatusFilterChange(
-                                if (state.selectedStatus == InvoiceStatus.PAID) null 
-                                else InvoiceStatus.PAID
-                            )
-                        },
-                        label = { Text("Lunas") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
-                
-                item {
-                    FilterChip(
-                        selected = state.selectedStatus == InvoiceStatus.CANCELLED,
-                        onClick = { 
-                            onStatusFilterChange(
-                                if (state.selectedStatus == InvoiceStatus.CANCELLED) null 
-                                else InvoiceStatus.CANCELLED
-                            )
-                        },
-                        label = { Text("Batal") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer
-                        )
-                    )
+                HistoryPeriod.entries.forEachIndexed { index, period ->
+                    SegmentedButton(
+                        selected = selectedPeriod == period,
+                        onClick = { selectedPeriod = period },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = HistoryPeriod.entries.size)
+                    ) {
+                        Text(period.label, style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HistorySummaryTile(
+                    label = "Total Pembelian",
+                    value = priceFormat.format(visibleInvoices.sumOf { it.totalAmount }),
+                    modifier = Modifier.weight(1f)
+                )
+                HistorySummaryTile(
+                    label = "Jumlah Transaksi",
+                    value = visibleInvoices.size.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
             
             if (state.isLoading) {
                 Box(
@@ -120,7 +145,7 @@ fun InvoiceListScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (state.invoices.isEmpty()) {
+            } else if (visibleInvoices.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -134,7 +159,7 @@ fun InvoiceListScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Belum ada invoice",
+                            text = "Belum ada transaksi",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -142,9 +167,10 @@ fun InvoiceListScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(state.invoices, key = { it.id }) { invoice ->
+                    items(visibleInvoices, key = { it.id }) { invoice ->
                         InvoiceListItem(
                             invoice = invoice,
                             onClick = { onInvoiceClick(invoice.id) }
@@ -154,6 +180,129 @@ fun InvoiceListScreen(
             }
         }
     }
+
+    if (showDownloadSheet) {
+        HistoryDownloadSheet(
+            periodCounts = periodCounts,
+            isExporting = state.isExporting,
+            onDismiss = { showDownloadSheet = false },
+            onPeriodSelected = { period ->
+                showDownloadSheet = false
+                onDownloadHistory(period)
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryDownloadSheet(
+    periodCounts: Map<HistoryPeriod, Int>,
+    isExporting: Boolean,
+    onDismiss: () -> Unit,
+    onPeriodSelected: (HistoryPeriod) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
+        ) {
+            Text(
+                text = "Download History Transaksi",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            HistoryPeriod.entries.forEach { period ->
+                val count = periodCounts[period] ?: 0
+                val enabled = !isExporting && count > 0
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = period.label,
+                            color = if (enabled) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "$count transaksi",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            imageVector = when (period) {
+                                HistoryPeriod.Today -> Icons.Default.Today
+                                HistoryPeriod.Week -> Icons.Default.DateRange
+                                HistoryPeriod.Month -> Icons.Default.CalendarMonth
+                            },
+                            contentDescription = null,
+                            tint = if (enabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = enabled) {
+                            onPeriodSelected(period)
+                        }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistorySummaryTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 }
 
 @Composable
@@ -161,61 +310,91 @@ fun InvoiceListItem(
     invoice: Invoice,
     onClick: () -> Unit
 ) {
-    val priceFormat = remember { NumberFormat.getCurrencyInstance(Locale("id", "ID")) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID")) }
+    val priceFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+            maximumFractionDigits = 0
+        }
+    }
+    val dayFormat = remember { SimpleDateFormat("dd", Locale("id", "ID")) }
+    val monthFormat = remember { SimpleDateFormat("MMM", Locale("id", "ID")) }
+    val timeFormat = remember { SimpleDateFormat("dd MMM yyyy | HH:mm", Locale("id", "ID")) }
     
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .width(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(vertical = 5.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = invoice.invoiceNumber,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = monthFormat.format(Date(invoice.date)).uppercase(Locale("id", "ID")),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
-                StatusChip(status = invoice.status)
+                Text(
+                    text = dayFormat.format(Date(invoice.date)),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             
-            Text(
-                text = invoice.customerName,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = dateFormat.format(Date(invoice.date)),
+                    text = timeFormat.format(Date(invoice.date)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = priceFormat.format(invoice.totalAmount),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
+                    text = invoice.customerName.ifBlank { "Customer" },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = invoice.invoiceNumber,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = priceFormat.format(invoice.totalAmount),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                StatusChip(status = invoice.status)
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
